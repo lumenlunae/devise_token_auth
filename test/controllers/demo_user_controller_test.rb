@@ -258,6 +258,71 @@ class DemoUserControllerTest < ActionDispatch::IntegrationTest
           end
         end
       end
+
+      describe 'successful request after 404' do
+        before do
+          age_token(@resource, @client_id)
+
+          get '/demo/members_only', {}, @auth_headers
+
+          @first_is_batch_request = assigns(:is_batch_request)
+          @first_user = assigns(:resource)
+          @first_access_token = response.headers['access-token']
+          @first_response_status = response.status
+
+          @resource.reload
+          age_token(@resource, @client_id)
+
+          get '/demo/404', {}, @auth_headers.merge({'access-token' => @first_access_token})
+
+          @second_is_batch_request = assigns(:is_batch_request)
+          @second_user = assigns(:resource)
+          @second_access_token = response.headers['access-token']
+          @second_response_status = response.status
+
+          @resource.reload
+          age_token(@resource, @client_id)
+
+          get '/demo/members_only', {}, @auth_headers.merge({'access-token' => @first_access_token})
+
+          @third_is_batch_request = assigns(:is_batch_request)
+          @third_user = assigns(:resource)
+          @third_access_token = response.headers['access-token']
+          @third_response_status = response.status
+        end
+
+        it 'should return success status on first request' do
+          assert_equal 200, @first_response_status
+        end
+
+        it 'should receive new token after successful request' do
+          refute_equal @first_access_token, @second_access_token
+        end
+
+        it 'should not treat first request as a batch request' do
+          refute @first_is_batch_request
+        end
+
+        it 'should return Not Found 404 status on second request' do
+          assert_equal 404, @second_response_status
+        end
+
+        it 'should not return a new token after a 404' do
+          refute @second_access_token
+        end
+
+        it 'should not treat second request as a batch request' do
+          refute @second_is_batch_request
+        end
+
+        it 'should return success status on third request' do
+          assert_equal 200, @third_response_status
+        end
+
+        it 'should not treat third request as a batch request' do
+          refute @third_is_batch_request
+        end
+      end
     end
 
     describe 'Existing Warden authentication' do
